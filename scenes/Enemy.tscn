@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy/Enemy.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/art/enemy_0.png" id="2"]
+[ext_resource type="Script" path="res://scripts/system/SpriteFlash.gd" id="3"]
+
+[sub_resource type="RectangleShape2D" id="shape"]
+size = Vector2(96, 84)
+
+[node name="Enemy" type="Area2D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("shape")
+
+[node name="SpriteFlash" type="Node" parent="."]
+script = ExtResource("3")

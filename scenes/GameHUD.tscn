@@ -1,0 +1,119 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/GameHUD.gd" id="1"]
+
+[node name="GameHUD" type="CanvasLayer"]
+script = ExtResource("1")
+
+[node name="Margin" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Top" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/separation = 40
+
+[node name="ScoreLabel" type="Label" parent="Margin/Top"]
+layout_mode = 2
+text = "Score: 0"
+theme_override_font_sizes/font_size = 36
+
+[node name="HealthLabel" type="Label" parent="Margin/Top"]
+layout_mode = 2
+text = "HP: 5/5"
+theme_override_font_sizes/font_size = 36
+
+[node name="BannerLabel" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.4
+anchor_right = 0.5
+anchor_bottom = 0.4
+grow_horizontal = 2
+grow_vertical = 2
+text = "第 1 关"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 72
+
+[node name="GameOverPanel" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="GameOverPanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="Center" type="CenterContainer" parent="GameOverPanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="GameOverPanel/Center"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="GameOverPanel/Center/VBox"]
+layout_mode = 2
+text = "GAME OVER"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 64
+
+[node name="FinalScore" type="Label" parent="GameOverPanel/Center/VBox"]
+layout_mode = 2
+text = "Score: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 40
+
+[node name="RestartButton" type="Button" parent="GameOverPanel/Center/VBox"]
+layout_mode = 2
+text = "RESTART"
+theme_override_font_sizes/font_size = 40
+
+[node name="VictoryPanel" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Dim" type="ColorRect" parent="VictoryPanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.1, 0.05, 0.7)
+
+[node name="Center" type="CenterContainer" parent="VictoryPanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="VictoryPanel/Center"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="VictoryPanel/Center/VBox"]
+layout_mode = 2
+text = "VICTORY!"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 72
+
+[node name="VictoryScore" type="Label" parent="VictoryPanel/Center/VBox"]
+layout_mode = 2
+text = "Score: 0"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 40
+
+[node name="VictoryRestartButton" type="Button" parent="VictoryPanel/Center/VBox"]
+layout_mode = 2
+text = "PLAY AGAIN"
+theme_override_font_sizes/font_size = 40
+
+

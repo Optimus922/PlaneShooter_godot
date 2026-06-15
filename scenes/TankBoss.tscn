@@ -1,0 +1,34 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy/TankBoss.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/art/boss_body.png" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/BossPart.tscn" id="3"]
+[ext_resource type="Texture2D" path="res://assets/art/boss_gun_sub.png" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/EnemyBullet.tscn" id="5"]
+
+[node name="TankBoss" type="Node2D"]
+script = ExtResource("1")
+parts = [NodePath("MainGun"), NodePath("SubGunL"), NodePath("SubGunR")]
+enemy_bullet_scene = ExtResource("5")
+
+[node name="Body" type="Sprite2D" parent="."]
+texture = ExtResource("2")
+
+[node name="MainGun" parent="." instance=ExtResource("3")]
+position = Vector2(0, 60)
+max_health = 60
+
+[node name="SubGunL" parent="." instance=ExtResource("3")]
+position = Vector2(-90, -10)
+max_health = 25
+
+[node name="Sprite" parent="SubGunL" index="0"]
+texture = ExtResource("4")
+
+[node name="SubGunR" parent="." instance=ExtResource("3")]
+position = Vector2(90, -10)
+max_health = 25
+
+[node name="Sprite" parent="SubGunR" index="0"]
+texture = ExtResource("4")
+

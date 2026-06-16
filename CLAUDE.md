@@ -68,6 +68,35 @@ icon.svg(占位图标)
 - `TankBoss`(Node2D):进场→上半屏徘徊+正弦起伏;主炮(parts[0])用 await 跑「3单发→停→扇形齐射→停」循环,副炮(parts[1..])定时瞄准玩家单发;全部 parts 破→计分+多处爆炸+回调 spawner。`TankBoss.tscn`(车体 Body + MainGun + SubGunL/R)。
 - Boss 找玩家靠 "player" 组(Player._ready 里 add_to_group)。spawner 用 boss.init_boss(回调) 等待击杀。
 
+## 美术工作流迁移:程序生成散图 → Aseprite + spritesheet(2026-06-16 起,进行中)
+**背景:** 用户接入了 Aseprite MCP,改用 Aseprite 逐像素手绘 + 导出 spritesheet 图集,替代旧的 `gen_pixel_art.py` 程序生成散图。目标是「一个实体一张图集 + 一个 SpriteFrames 资源」,用 `AnimatedSprite2D` 播动画,告别一堆 `_0/_1` 散图。
+
+**Aseprite MCP 环境(本机已配好):**
+- MCP 代码:`H:\download\Chrome\aseprite-mcp`(包名 `aseprite_mcp`,启动 `python -m aseprite_mcp`,stdio)。
+- Aseprite 可执行:`H:\download\Chrome\Aseprite-v1.3.17.2-Source\build\bin\aseprite.exe`,路径写在 `aseprite-mcp/.env` 的 `ASEPRITE_PATH`。
+- 已写入 Claude Desktop `claude_desktop_config.json` 的 `mcpServers.aseprite`;trustedFolders 已加这两个目录。
+
+**标准流程(每个实体照此办理):**
+1. Aseprite 建 16x16(或对应尺寸)`.aseprite`,源文件存 `assets/art/<name>.aseprite`(**源文件要保留**,后续改动靠它)。
+2. 多帧逐像素画(`draw_pixels_at` 需带 `layer_name`,默认层名 `"Layer 1"`)。
+3. `export_spritesheet` 导出横向图集 `assets/art/<name>.png`,scale=6(与旧素材的 16x16→96px 一致)。
+4. 写 `assets/art/<name>_frames.tres`(SpriteFrames,AtlasTexture 按 96px 切帧,定义具名动画 + loop + speed)。
+5. 场景里把 `Sprite2D` 换成 `AnimatedSprite2D`,`sprite_frames` 指向 tres,设 `autoplay`。**节点名保持不变**(如玩家仍叫 `Sprite`),这样引用该节点的脚本零改动。
+6. 像素清晰度:沿用 project.godot 的 `default_texture_filter=0`(Nearest),图集 `.import` 不必单独设 filter。
+
+**已完成:玩家机(player)**
+- 源:`assets/art/player_0.aseprite`(2 帧:短喷焰 / 长喷焰)。图集:`assets/art/player.png`(192x96,横排 2 帧)。资源:`assets/art/player_frames.tres`(动画 `idle`,2帧 loop,speed=10)。
+- `Player.tscn`:`Sprite` 节点由 Sprite2D → **AnimatedSprite2D**,autoplay=idle。
+- **`PlayerBanking.gd` / `PlayerHealth.gd` 未改**:二者靠 `get_node("Sprite")` 取节点、只用 `rotation_degrees` / `visible`,AnimatedSprite2D 全兼容。用户已在 Godot 验证:动画播放、倾斜、受击闪烁均正常。
+- 旧 `player_0.png`/`player_1.png`(+import)已删。
+
+**待迁移(仍用旧散图,改到对应实体时再清理散图):**
+- **爆炸**:`explosion_0..6`(7帧)。现 `Explosion.gd` 是运行时逐帧 `load()` 换贴图 —— 改成 7 帧图集 + AnimatedSprite2D 播一次自销(去掉运行时 load,性能更好)。下一个要做的。
+- **敌机**:`enemy_0`。加飞行循环(机身/喷焰微动);注意 `SpriteFlash` 闪白要兼容 AnimatedSprite2D。
+- **Boss / 子弹 / 敌弹**:`boss_body`、`boss_gun_main/sub`、`bullet`、`enemy_bullet` 按需做图集或保留静态。
+- `stars`(滚动背景)保持现状。
+- 全部迁移完后:删 `gen_pixel_art.py` 或标注废弃。
+
 ## 碰撞层
 - 1=player,2=player_bullet,3(=1+2 的 mask 值,非层)。层位:player=layer1,player_bullet=layer2,enemy/boss_part/enemy_bullet=layer4。
 - player(layer1,mask4)、player_bullet(layer2,mask4)、enemy(layer4,mask3)、enemy_bullet(layer4,mask1)、boss_part(layer4,mask0)。
@@ -76,11 +105,19 @@ icon.svg(占位图标)
 - 本机 VM 无 Godot 可执行文件,**未能跑 `--check-only`**;但用户机 **Godot 4.6.3** 已打开并导入项目:`.godot/global_script_class_cache.cfg` 注册了全部 14 个 class_name 脚本、贴图/音效均已导入,无导入报错。建议运行一局完整验证(2关+Boss+通关)。
 
 ## 已知清理项
-- 项目根下有个**多余嵌套目录 `PlaneShooter_godot/assets/art/`**(早期脚本路径 bug 残留的重复旧图),未被任何场景引用,可手动删除。VM 内删除受权限限制删不掉。
+- ~~多余嵌套目录 `PlaneShooter_godot/assets/art/`~~ **已于 2026-06-16 删除**(连同玩家旧散图)。
 
 ## 踩坑记录
 - **ColorRect 视觉节点的引用类型要用 `CanvasItem`,不能用 `Node2D`。** ColorRect 属 Control→CanvasItem 分支。`visible` 在 CanvasItem 上;换 Sprite2D(属 Node2D)也兼容 CanvasItem。
 - **实例化节点先 add_child 再设 global_position**,否则未入树时 global 变换不可靠。spawner/Boss 已按此修正。
 - 启动日志 `... low quality OpenGL 3.3 support, switching to ANGLE` 是显卡驱动提示,无害。
 - 手写大段文件时注意:单次 Edit/Write 有体积上限,超了会被静默截断,需分块写。
+
+## 协作约定(跨工具)
+- **本文件(CLAUDE.md)是项目上下文的唯一真源。** 根目录的 `AGENTS.md`(Codex 用)只是一句指引,指向本文件;任何工具更新进度都写这里,不要在 AGENTS.md 里另起一份,避免两边跑偏。
+- **绝不碰 git。** 所有 git 操作(add/commit/push/分支/还原等)一律由用户手工进行。AI 不得执行任何 git 命令,也不要主动建议提交。用户 2026-06-16 明确要求。
+
+## 变更历史
+- **2026-06-16(Claude / Aseprite 工作流):** 接入 Aseprite MCP,启动「程序生成散图 → 手绘 spritesheet 图集」迁移(详见上方专章)。完成**玩家机**图集化:`player.aseprite`(2帧喷焰循环)→ `player.png` 图集 + `player_frames.tres`(SpriteFrames),`Player.tscn` 改用 AnimatedSprite2D(节点仍名 `Sprite`,依赖脚本零改动)。删除玩家旧散图与误建嵌套目录。爆炸/敌机/Boss 待迁移。
+- **2026-06-15(Codex 改动):** 重写 `tools/gen_pixel_art.py` 的美术风格为"科幻像素风"(钢铁灰 + 青/紫霓虹、更锋利轮廓),并重新生成 `assets/art/` 下全部贴图(player_0/1、enemy_0、bullet、enemy_bullet、explosion_0..6、boss_body、boss_gun_main/sub、stars)。文件名/尺寸保持兼容,场景无需改。**当前磁盘上的美术是这版科幻风,不是最初的街机蓝版**(玩家机已被上面的 Aseprite 版覆盖)。若调机体外形可改 `scripts/player/Player.gd` 的 `_half_extents`。
 

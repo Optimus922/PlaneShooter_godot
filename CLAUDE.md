@@ -71,10 +71,16 @@ icon.svg(占位图标)
 ## 美术工作流迁移:程序生成散图 → Aseprite + spritesheet(2026-06-16 起,进行中)
 **背景:** 用户接入了 Aseprite MCP,改用 Aseprite 逐像素手绘 + 导出 spritesheet 图集,替代旧的 `gen_pixel_art.py` 程序生成散图。目标是「一个实体一张图集 + 一个 SpriteFrames 资源」,用 `AnimatedSprite2D` 播动画,告别一堆 `_0/_1` 散图。
 
-**Aseprite MCP 环境(本机已配好):**
-- MCP 代码:`H:\download\Chrome\aseprite-mcp`(包名 `aseprite_mcp`,启动 `python -m aseprite_mcp`,stdio)。
-- Aseprite 可执行:`H:\download\Chrome\Aseprite-v1.3.17.2-Source\build\bin\aseprite.exe`,路径写在 `aseprite-mcp/.env` 的 `ASEPRITE_PATH`。
-- 已写入 Claude Desktop `claude_desktop_config.json` 的 `mcpServers.aseprite`;trustedFolders 已加这两个目录。
+**Aseprite MCP 环境:**
+
+*旧机器(Windows,已弃用):* MCP 代码 `H:\download\Chrome\aseprite-mcp`;Aseprite 可执行 `H:\...\build\bin\aseprite.exe`。
+
+*当前机器(Intel Mac / macOS,2026-06-17 配好):*
+- MCP 代码:`/Users/huoqing/projects/aseprite-mcp`(clone 自 github diivi/aseprite-mcp,包名 `aseprite_mcp`,stdio)。**要求 Python ≥3.13**,用 **uv** 管理(`uv sync` 装依赖,启动 `uv run -m aseprite_mcp`)。系统 Python 3.9 太旧用不了。
+- Aseprite 可执行(自编 v1.3.17.2,Skia **m124**,Intel x64):`/Users/huoqing/projects/gitprojects/Aseprite-v1.3.17.2-Source/build/bin/aseprite.app/Contents/MacOS/aseprite`。Skia 预编译包在 `/Users/huoqing/projects/gitprojects/Skia-macOS-Release-x64`(静态链接,运行时已不依赖)。
+- `.env` 的 `ASEPRITE_PATH` 指向上面可执行文件。
+- 配在 **Cowork**(非经典 Claude Desktop):`~/Library/Application Support/Claude-3p/claude_desktop_config.json` 的 `mcpServers.aseprite`。关键:`command` 用 uv 绝对路径 `/Users/huoqing/.local/bin/uv`(GUI 应用无 shell PATH),`args` 带 `--directory /Users/huoqing/projects/aseprite-mcp`,`env` 里冗余再放一份 `ASEPRITE_PATH`(双保险)。改完须 `Cmd+Q` 彻底重启 Cowork 生效。
+- 编译要点(重编时参考):INSTALL.md 钦定 Skia 版本随 Aseprite 版本变(v1.3.17.2→m124,**别按版本新旧猜**);cmake 用 `-DCMAKE_OSX_DEPLOYMENT_TARGET=10.14 -DLAF_BACKEND=skia -DSKIA_DIR/-DSKIA_LIBRARY_DIR(out/Release-x64)/-DSKIA_LIBRARY(libskia.a) -G Ninja`,然后 `ninja aseprite`;产物是 `.app` 包,可执行在 `Contents/MacOS/aseprite`。
 
 **标准流程(每个实体照此办理):**
 1. Aseprite 建 16x16(或对应尺寸)`.aseprite`,源文件存 `assets/art/<name>.aseprite`(**源文件要保留**,后续改动靠它)。
@@ -118,6 +124,7 @@ icon.svg(占位图标)
 - **绝不碰 git。** 所有 git 操作(add/commit/push/分支/还原等)一律由用户手工进行。AI 不得执行任何 git 命令,也不要主动建议提交。用户 2026-06-16 明确要求。
 
 ## 变更历史
+- **2026-06-17(Claude / 新机器环境搭建):** 在新的 **Intel Mac** 上从零重配 Aseprite MCP(旧 Windows 环境弃用)。从源码编译 Aseprite v1.3.17.2(Skia **m124**,产物 `.app` 包,移到 `~/projects/gitprojects/`);装 uv + Python 3.13 跑 `aseprite-mcp`(`~/projects/aseprite-mcp`);配进 **Cowork** 的 `claude_desktop_config.json`(uv 绝对路径 + `--directory` + 冗余 `ASEPRITE_PATH`)。**已建测试文件画像素并 scale=6 导出 PNG,MCP 工具链(create_canvas / draw_pixels_at / export_frame)全部验证可用。** 详见上方「Aseprite MCP 环境」专章。下一步:继续迁移**爆炸动画**为图集。
 - **2026-06-16(Claude / Aseprite 工作流):** 接入 Aseprite MCP,启动「程序生成散图 → 手绘 spritesheet 图集」迁移(详见上方专章)。完成**玩家机**图集化:`player.aseprite`(2帧喷焰循环)→ `player.png` 图集 + `player_frames.tres`(SpriteFrames),`Player.tscn` 改用 AnimatedSprite2D(节点仍名 `Sprite`,依赖脚本零改动)。删除玩家旧散图与误建嵌套目录。爆炸/敌机/Boss 待迁移。
 - **2026-06-15(Codex 改动):** 重写 `tools/gen_pixel_art.py` 的美术风格为"科幻像素风"(钢铁灰 + 青/紫霓虹、更锋利轮廓),并重新生成 `assets/art/` 下全部贴图(player_0/1、enemy_0、bullet、enemy_bullet、explosion_0..6、boss_body、boss_gun_main/sub、stars)。文件名/尺寸保持兼容,场景无需改。**当前磁盘上的美术是这版科幻风,不是最初的街机蓝版**(玩家机已被上面的 Aseprite 版覆盖)。若调机体外形可改 `scripts/player/Player.gd` 的 `_half_extents`。
 

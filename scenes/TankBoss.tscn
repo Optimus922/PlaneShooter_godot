@@ -1,34 +1,98 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy/TankBoss.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/art/boss_body.png" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/BossPart.tscn" id="3"]
-[ext_resource type="Texture2D" path="res://assets/art/boss_gun_sub.png" id="4"]
-[ext_resource type="PackedScene" path="res://scenes/EnemyBullet.tscn" id="5"]
+[ext_resource type="Texture2D" path="res://assets/art/boss_gun_side.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/art/boss_gun_sub.png" id="5"]
+[ext_resource type="Texture2D" path="res://assets/art/boss_gun_main.png" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/EnemyBullet.tscn" id="7"]
+
+[sub_resource type="RectangleShape2D" id="side_shape"]
+size = Vector2(42, 42)
+
+[sub_resource type="RectangleShape2D" id="sub_shape"]
+size = Vector2(30, 30)
+
+[sub_resource type="RectangleShape2D" id="core_shape"]
+size = Vector2(56, 56)
 
 [node name="TankBoss" type="Node2D"]
 script = ExtResource("1")
-parts = [NodePath("MainGun"), NodePath("SubGunL"), NodePath("SubGunR")]
-enemy_bullet_scene = ExtResource("5")
+turrets = [NodePath("SideL"), NodePath("SideR"), NodePath("SubA_L"), NodePath("SubA_R"), NodePath("SubB_L"), NodePath("SubB_R")]
+core_path = NodePath("Core")
+enemy_bullet_scene = ExtResource("7")
 
 [node name="Body" type="Sprite2D" parent="."]
 texture = ExtResource("2")
 
-[node name="MainGun" parent="." instance=ExtResource("3")]
-position = Vector2(0, 60)
-max_health = 60
+[node name="SideL" parent="." instance=ExtResource("3")]
+position = Vector2(-78, -66)
+max_health = 40
 
-[node name="SubGunL" parent="." instance=ExtResource("3")]
-position = Vector2(-90, -10)
-max_health = 25
-
-[node name="Sprite" parent="SubGunL" index="0"]
+[node name="Sprite" parent="SideL" index="0"]
 texture = ExtResource("4")
 
-[node name="SubGunR" parent="." instance=ExtResource("3")]
-position = Vector2(90, -10)
-max_health = 25
+[node name="CollisionShape2D" parent="SideL" index="1"]
+shape = SubResource("side_shape")
 
-[node name="Sprite" parent="SubGunR" index="0"]
+[node name="SideR" parent="." instance=ExtResource("3")]
+position = Vector2(78, -66)
+max_health = 40
+
+[node name="Sprite" parent="SideR" index="0"]
 texture = ExtResource("4")
 
+[node name="CollisionShape2D" parent="SideR" index="1"]
+shape = SubResource("side_shape")
+
+[node name="SubA_L" parent="." instance=ExtResource("3")]
+position = Vector2(-92, 10)
+max_health = 22
+
+[node name="Sprite" parent="SubA_L" index="0"]
+texture = ExtResource("5")
+
+[node name="CollisionShape2D" parent="SubA_L" index="1"]
+shape = SubResource("sub_shape")
+
+[node name="SubA_R" parent="." instance=ExtResource("3")]
+position = Vector2(92, 10)
+max_health = 22
+
+[node name="Sprite" parent="SubA_R" index="0"]
+texture = ExtResource("5")
+
+[node name="CollisionShape2D" parent="SubA_R" index="1"]
+shape = SubResource("sub_shape")
+
+[node name="SubB_L" parent="." instance=ExtResource("3")]
+position = Vector2(-58, 72)
+max_health = 22
+
+[node name="Sprite" parent="SubB_L" index="0"]
+texture = ExtResource("5")
+
+[node name="CollisionShape2D" parent="SubB_L" index="1"]
+shape = SubResource("sub_shape")
+
+[node name="SubB_R" parent="." instance=ExtResource("3")]
+position = Vector2(58, 72)
+max_health = 22
+
+[node name="Sprite" parent="SubB_R" index="0"]
+texture = ExtResource("5")
+
+[node name="CollisionShape2D" parent="SubB_R" index="1"]
+shape = SubResource("sub_shape")
+
+[node name="Core" parent="." instance=ExtResource("3")]
+position = Vector2(0, -6)
+max_health = 80
+invincible = true
+
+[node name="Sprite" parent="Core" index="0"]
+texture = ExtResource("6")
+
+[node name="CollisionShape2D" parent="Core" index="1"]
+shape = SubResource("core_shape")

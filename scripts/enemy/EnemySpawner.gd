@@ -97,18 +97,47 @@ func _run_level(level: LevelData) -> void:
 			await _wait(wave.delay_after_clear)
 
 
-## 执行单波:逐架生成,然后等到本波敌机全部离场(击毁全部才过波)。
+## 执行单波:先零散刷怪,再刷一个编队(横排/纵列),编队里含一架精英(掉道具)。
+## 全部离场(击毁/出屏)才过波。
 func _run_wave(wave: WaveData, prefab: PackedScene) -> void:
 	_alive_count = 0
+	# 零散小怪(无精英)
 	for i in wave.enemy_count:
 		if _is_game_ended():
 			return
-		_spawn_one(prefab)
-		if i < wave.enemy_count - 1 and wave.spawn_interval > 0.0:
+		_spawn_one(prefab, false)
+		if wave.spawn_interval > 0.0:
 			await _wait(wave.spawn_interval)
+	# 编队(横排或纵列,含一架精英)
+	if not _is_game_ended():
+		await _wait(0.6)
+		_spawn_formation(prefab)
 	# 等本波全部离场
 	while _alive_count > 0 and not _is_game_ended():
 		await get_tree().process_frame
+
+
+## 生成一个编队:随机横排并列 或 纵列鱼贯,其中一架是精英。
+func _spawn_formation(prefab: PackedScene) -> void:
+	var count := 5
+	var elite_index := randi() % count
+	var rect := get_viewport_rect()
+	var horizontal := randf() < 0.5
+	if horizontal:
+		# 横排并列:屏幕中部均匀分布的 X,同一时刻进入
+		var span := rect.size.x - horizontal_padding * 2.0
+		for i in count:
+			if _is_game_ended():
+				return
+			var x := rect.position.x + horizontal_padding + span * float(i) / float(count - 1)
+			_spawn_at(prefab, Vector2(x, -spawn_height_offset), i == elite_index)
+	else:
+		# 纵列鱼贯:同一 X,依次下来
+		var x := randf_range(rect.position.x + horizontal_padding, rect.end.x - horizontal_padding)
+		for i in count:
+			if _is_game_ended():
+				return
+			_spawn_at(prefab, Vector2(x, -spawn_height_offset - i * 90.0), i == elite_index)
 
 
 ## 生成本关 Boss,等待其被击杀。
@@ -131,17 +160,26 @@ func _run_boss(boss_scene: PackedScene) -> void:
 		await get_tree().process_frame
 
 
-func _spawn_one(prefab: PackedScene) -> void:
+func _spawn_one(prefab: PackedScene, is_elite: bool = false) -> void:
+	if prefab == null:
+		return
+	var rect := get_viewport_rect()
+	var x := randf_range(rect.position.x + horizontal_padding, rect.end.x - horizontal_padding)
+	_spawn_at(prefab, Vector2(x, -spawn_height_offset), is_elite)
+
+
+## 在指定位置生成一架敌机。
+func _spawn_at(prefab: PackedScene, pos: Vector2, is_elite: bool) -> void:
 	if prefab == null:
 		return
 	var enemy := prefab.instantiate()
-	var rect := get_viewport_rect()
-	var x := randf_range(rect.position.x + horizontal_padding, rect.end.x - horizontal_padding)
 	# 敌机离场时回调,减少存活计数(用于波次判定)。入树前设回调,入树后摆位。
 	if enemy.has_method("set_on_returned"):
 		enemy.set_on_returned(_on_enemy_returned)
 	get_tree().current_scene.add_child(enemy)
-	enemy.global_position = Vector2(x, -spawn_height_offset)
+	enemy.global_position = pos
+	if is_elite and enemy.has_method("make_elite"):
+		enemy.make_elite()
 	_alive_count += 1
 
 

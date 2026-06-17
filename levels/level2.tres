@@ -1,8 +1,7 @@
-[gd_resource type="Resource" script_class="LevelData" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="LevelData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/system/LevelData.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/system/WaveData.gd" id="2"]
-[ext_resource type="PackedScene" path="res://scenes/TankBoss.tscn" id="3"]
 
 [sub_resource type="Resource" id="wave1"]
 script = ExtResource("2")
@@ -12,6 +11,12 @@ delay_after_clear = 1.0
 
 [sub_resource type="Resource" id="wave2"]
 script = ExtResource("2")
+enemy_count = 8
+spawn_interval = 0.5
+delay_after_clear = 1.0
+
+[sub_resource type="Resource" id="wave3"]
+script = ExtResource("2")
 enemy_count = 10
 spawn_interval = 0.4
 delay_after_clear = 1.0
@@ -19,6 +24,4 @@ delay_after_clear = 1.0
 [resource]
 script = ExtResource("1")
 level_name = "Level 2"
-waves = [SubResource("wave1"), SubResource("wave2")]
-boss_scene = ExtResource("3")
-
+waves = [SubResource("wave1"), SubResource("wave2"), SubResource("wave3")]

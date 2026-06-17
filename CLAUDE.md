@@ -60,13 +60,51 @@ icon.svg(占位图标)
 - `EnemySpawner` 重写:用 await/计时跑 campaign。每关「第X关」横幅 → 逐波刷怪(**整波击毁才过波**,靠 Enemy.set_on_returned 回调计数)→ 可选 Boss(「警告!Boss来袭」)→「第X关通过」→ 下一关 → 全清 trigger_victory。
 - `GameManager` 加 VICTORY 状态 + victory/banner_requested 信号;HUD 加横幅 Label + Victory 面板。
 - `Enemy` 加 set_on_returned/_return():离场(死亡/出屏/撞玩家)只回调一次。
-- 关卡配置:`levels/level1.tres`(3波无Boss)、`level2.tres`(2波+TankBoss);Main.tscn 的 EnemySpawner.levels 引用二者。
+- 关卡配置(2026-06-17 改为**三关**,每关=小怪波次+关底Boss):`level1.tres`(3波 + **坦克Boss**)、`level2.tres`(3波,Boss待设计 boss_scene留空)、`level3.tres`(3波,Boss待设计)。小怪数量/密度逐关递增。Main.tscn 的 EnemySpawner.levels 引用三者。**坦克Boss 是第一关的Boss**(之前误放在第二关,已修正)。后两关 Boss 设计待用户确定。
+
+### 小怪/命中反馈调整(2026-06-17)
+- **普通小怪血量 3**(Enemy.max_health 2→3,子弹 damage=1,要打 3 下)。
+- **精英小怪**:`Enemy.make_elite()` → 血量 10、分数 300、`Sprite.modulate` 染红、死亡掉道具。注:染色(非独立红贴图),后续做敌机图集时可出专门精英图。**精英现在出现在编队里**(见下「武器/道具/编队」),不再是零散波随机挑。
+- **命中反馈分两种**:子弹命中 `take_damage(damage, hit_pos)` 传命中坐标。**未死** → `ExplosionManager.spawn_dust(hit_pos)` 在命中点喷暖白火花(CPUParticles2D 程序生成,~0.6s 自销,无美术);**死亡** → 沿用爆炸+音效。
+
+### 武器系统 / 道具 / 编队(2026-06-17)
+**武器(Player.gd,enum Weapon { SINGLE, SPREAD, AURORA, HOMING }):**
+- `SINGLE` 单发(默认,射速 0.18)。`SPREAD` 散弹:3 发扇形 ±18°(0.24)。`AURORA` 极光:2 道并排**贯穿**弹(0.14)。`HOMING` 跟踪:2 发**追踪**最近敌人(0.30)。
+- `set_weapon(w)` 切换并立即可射;**死亡/重开恢复 SINGLE**(场景重载,Player 默认 SINGLE)。
+- `_spawn_bullet(dir, opts)`:opts 可含 pierce/homing/damage/offset。
+**子弹(Bullet.gd)扩展:**
+- `pierce`:命中不销毁,用 `_hit_set`(instance_id)防重复命中同一目标。
+- `homing`:每帧找 "enemy" 组最近目标,`slerp` 按 turn_rate 渐转。出屏(四向)/超时回收。
+- **Enemy/BossPart 都 add_to_group("enemy")** 供跟踪锁定;死亡时移出组(Enemy 靠 queue_free 自动,BossPart 显式 remove)。
+**道具(PowerUp.gd / PowerUp.tscn,layer0/mask1 检测玩家):**
+- 三种 weapon_type:1=SPREAD 2=AURORA 3=HOMING,各自图标 `assets/art/powerup_{spread,aurora,homing}.png`(16x16,Aseprite 画)。`set_type(t)` 切图标。
+- 向下飘 + 左右摇摆,玩家碰到 → `player.set_weapon(weapon_type)` + 拾取音效,出屏回收。
+- **精英死亡掉落随机道具**(Enemy._drop_powerup,随机 1-3 种)。
+**编队(EnemySpawner._run_wave 重构):**
+- 每波 = 先零散刷 enemy_count 架(**无精英**)→ 停 0.6s → 刷一个 5 架**编队**(50% 横排并列 / 50% 纵列鱼贯),编队里随机一架是**精英**(掉道具)。
+- 全部离场(击毁/出屏)才过波。
+- `take_damage` 签名加可选第二参 `hit_pos`:Enemy 用它定位粉尘;BossPart 也加了 `_hit_pos`(不用,仅保持子弹统一调用 `take_damage(dmg, pos)`)。PlayerHealth 仍是单参(只被敌机/敌弹单参调用,不受影响)。
 
 **阶段9 坦克 Boss:**
 - `EnemyBullet`(Area2D,layer4/mask1):launch(dir) 朝玩家飞,命中玩家扣血,出屏回收。`EnemyBullet.tscn`。
-- `BossPart`(Area2D,layer4):可破坏炮台,take_damage+闪白+运行时 ColorRect 头顶血条,破了回调 Boss。`BossPart.tscn`。
-- `TankBoss`(Node2D):进场→上半屏徘徊+正弦起伏;主炮(parts[0])用 await 跑「3单发→停→扇形齐射→停」循环,副炮(parts[1..])定时瞄准玩家单发;全部 parts 破→计分+多处爆炸+回调 spawner。`TankBoss.tscn`(车体 Body + MainGun + SubGunL/R)。
+- `BossPart`(Area2D,layer4):可破坏炮台,take_damage+闪白+运行时 ColorRect 头顶血条,破了回调 Boss。`BossPart.tscn`。`invincible` 标志:无敌时打不动、血条隐藏;`set_vulnerable()` 解除(核心舱用)。
+- `TankBoss`(Node2D):进场→上半屏徘徊+正弦起伏;主炮(parts[0])用 await 跑「3单发→停→扇形齐射→停」循环,副炮(parts[1..])定时瞄准玩家单发;全部 parts 破→计分+多处爆炸+回调 spawner。
 - Boss 找玩家靠 "player" 组(Player._ready 里 add_to_group)。spawner 用 boss.init_boss(回调) 等待击杀。
+
+### Boss 重做:赤色要塞风巨型战车(2026-06-17,T-95「Arktika」参考)
+- 旧版是 48x32 小色块坦克,太寒碜。按用户给的 T-95 末日重坦参考重做成**陆地战列舰**式 Boss。
+- **美术(Aseprite Lua 程序绘制,顶视纯军事坦克):**
+  - `boss_body.png` 230x200:**多层阶梯式车体**(3 层装甲台阶往中央收,每层高光/阴影边做立体感)+ 厚重履带 + 铆钉/格栅/前斜装甲。深橄榄绿。
+  - `boss_gun_main.png` 64x110:中央主炮塔 + 超长粗炮管(**最终弱点**)。
+  - `boss_gun_side.png` 48x88:大型侧炮塔(上方两角)。
+  - `boss_gun_sub.png` 36x48:小副炮塔(四周 4 个)。
+  - 源 `.aseprite` 均保留。`boss_core.aseprite` 是早期发光核心方案,**已弃用**(用户最终选纯军事坦克、主炮塔为弱点)。
+- **结构 = 6 外围炮塔 + 1 中央核心(主炮塔)**,共 7 个 BossPart:
+  - `turrets[]` = SideL/R(大侧炮,血40)+ SubA_L/R + SubB_L/R(小副炮,血22)。turrets[0]=SideL 跑主炮节奏循环。
+  - `Core` = 中央主炮塔(`boss_gun_main`,血80,**初始 invincible**)。
+- **玩法层次(赤色要塞精髓):** 6 炮塔全破前核心无敌打不动;全破→`_expose_core()` 解除核心无敌 + 弹「核心暴露!」横幅;核心暴露后还会放**环形弹幕**;只有**核心破才 Defeat**(计分 800 + 全场爆炸)。
+- 场景 `TankBoss.tscn`:Body + 6 炮塔(各 override texture/碰撞体)+ Core;挂点坐标见该文件(车体中心为原点)。`hover_y=460`、`horizontal_padding=140`(车体大,徘徊范围收窄)。
+- 待验证:实机跑 Boss 战(拆 6 炮塔→核心暴露→击杀);可能要调炮塔挂点让长炮管充分露出、核心暴露的视觉区分(目前靠血条出现+横幅,未做变色)。
 
 ## 美术工作流迁移:程序生成散图 → Aseprite + spritesheet(2026-06-16 起,进行中)
 **背景:** 用户接入了 Aseprite MCP,改用 Aseprite 逐像素手绘 + 导出 spritesheet 图集,替代旧的 `gen_pixel_art.py` 程序生成散图。目标是「一个实体一张图集 + 一个 SpriteFrames 资源」,用 `AnimatedSprite2D` 播动画,告别一堆 `_0/_1` 散图。
@@ -116,6 +154,7 @@ icon.svg(占位图标)
 ## 踩坑记录
 - **ColorRect 视觉节点的引用类型要用 `CanvasItem`,不能用 `Node2D`。** ColorRect 属 Control→CanvasItem 分支。`visible` 在 CanvasItem 上;换 Sprite2D(属 Node2D)也兼容 CanvasItem。
 - **实例化节点先 add_child 再设 global_position**,否则未入树时 global 变换不可靠。spawner/Boss 已按此修正。
+- **add_child 是同步的,会立刻触发子节点的 `_ready()`。** 若生成方是「先 add_child 再设 global_position」,则子节点 `_ready()` 里读到的 global_position 还是 (0,0)。PowerUp 曾在 `_ready` 里 `_base_x = global_position.x` 取到 0,导致道具不管精英死在哪都飘到屏幕最左。**修法:** 把依赖 global_position 的初始化延到首帧 `_physics_process`(用 `_base_inited` 标志),那时坐标已设好。凡是在子节点 `_ready` 读自身世界坐标的,都要警惕这个时序。
 - 启动日志 `... low quality OpenGL 3.3 support, switching to ANGLE` 是显卡驱动提示,无害。
 - 手写大段文件时注意:单次 Edit/Write 有体积上限,超了会被静默截断,需分块写。
 
@@ -124,7 +163,8 @@ icon.svg(占位图标)
 - **绝不碰 git。** 所有 git 操作(add/commit/push/分支/还原等)一律由用户手工进行。AI 不得执行任何 git 命令,也不要主动建议提交。用户 2026-06-16 明确要求。
 
 ## 变更历史
-- **2026-06-17(Claude / 新机器环境搭建):** 在新的 **Intel Mac** 上从零重配 Aseprite MCP(旧 Windows 环境弃用)。从源码编译 Aseprite v1.3.17.2(Skia **m124**,产物 `.app` 包,移到 `~/projects/gitprojects/`);装 uv + Python 3.13 跑 `aseprite-mcp`(`~/projects/aseprite-mcp`);配进 **Cowork** 的 `claude_desktop_config.json`(uv 绝对路径 + `--directory` + 冗余 `ASEPRITE_PATH`)。**已建测试文件画像素并 scale=6 导出 PNG,MCP 工具链(create_canvas / draw_pixels_at / export_frame)全部验证可用。** 详见上方「Aseprite MCP 环境」专章。下一步:继续迁移**爆炸动画**为图集。
+- **2026-06-17(Claude / 玩法扩展 + Boss重做 + 背景):** 本次会话一口气加了多块内容(详见上方各专章):①**双层视差星空背景**(`ScrollingBackground` 远近两层各自循环 + `DriftingPlanet` 星球过场,Aseprite Lua 程序绘制 bg_far/bg_near/planet_big/small);②**关卡改三关**,坦克Boss归位到第1关,后两关Boss待设计;③**Boss重做成赤色要塞风T-95巨型战车**(230x200多层阶梯车体 + 中央主炮塔为最终弱点 + 6外围炮塔,核心无敌阶段玩法);④**小怪血量3 + 精英(血10染红掉道具)+ 命中粉尘/死亡爆炸**两段反馈;⑤**武器系统**(单发/散弹/极光贯穿/跟踪弹)+ **三种道具**(Aseprite画图标,精英掉落)+ **编队生成**(横排/纵列含精英)。修了道具坐标 bug(见踩坑记录 add_child 时序)。窗口 override 270x480(设计分辨率 1080x1920)。
+- **2026-06-17(Claude / 新机器环境搭建):** 在新的 **Intel Mac** 上从零重配 Aseprite MCP(旧 Windows 环境弃用)。从源码编译 Aseprite v1.3.17.2(Skia **m124**,产物 `.app` 包,移到 `~/projects/gitprojects/`);装 uv + Python 3.13 跑 `aseprite-mcp`(`~/projects/aseprite-mcp`);配进 **Cowork** 的 `claude_desktop_config.json`(uv 绝对路径 + `--directory` + 冗余 `ASEPRITE_PATH`)。**已建测试文件画像素并 scale=6 导出 PNG,MCP 工具链(create_canvas / draw_pixels_at / export_frame)全部验证可用。** 详见上方「Aseprite MCP 环境」专章。
 - **2026-06-16(Claude / Aseprite 工作流):** 接入 Aseprite MCP,启动「程序生成散图 → 手绘 spritesheet 图集」迁移(详见上方专章)。完成**玩家机**图集化:`player.aseprite`(2帧喷焰循环)→ `player.png` 图集 + `player_frames.tres`(SpriteFrames),`Player.tscn` 改用 AnimatedSprite2D(节点仍名 `Sprite`,依赖脚本零改动)。删除玩家旧散图与误建嵌套目录。爆炸/敌机/Boss 待迁移。
 - **2026-06-15(Codex 改动):** 重写 `tools/gen_pixel_art.py` 的美术风格为"科幻像素风"(钢铁灰 + 青/紫霓虹、更锋利轮廓),并重新生成 `assets/art/` 下全部贴图(player_0/1、enemy_0、bullet、enemy_bullet、explosion_0..6、boss_body、boss_gun_main/sub、stars)。文件名/尺寸保持兼容,场景无需改。**当前磁盘上的美术是这版科幻风,不是最初的街机蓝版**(玩家机已被上面的 Aseprite 版覆盖)。若调机体外形可改 `scripts/player/Player.gd` 的 `_half_extents`。
 

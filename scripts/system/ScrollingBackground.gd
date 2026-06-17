@@ -1,40 +1,79 @@
 extends Node2D
 class_name ScrollingBackground
-## 滚动星空背景。复刻 Unity 版 ScrollingBackground。
-## 用两块 Sprite2D 纹理(开启 region/repeat)纵向滚动循环。
-## 这里用 region_enabled + 纹理 repeat,通过移动 region_rect 偏移实现无缝滚动。
+## 双层视差星空背景。远层(far)慢、近层(near)快,各自纵向无缝循环。
+## 用「每层两块贴图上下接力」做无缝滚动,不依赖纹理导入的 repeat 设置(更稳)。
+##
+## 贴图 1080x960。每层两块 Sprite2D 竖直拼接,整体向下滚;
+## 某一块完全移出屏幕底部后,跳回另一块的上方,如此循环。
+##
+## 节点结构(.tscn 里需要):
+##   ScrollingBackground (本脚本)
+##     Far  : Sprite2D  (texture=bg_far)   —— 仅作模板,运行时复制成两块
+##     Near : Sprite2D  (texture=bg_near)
 
-@export var scroll_speed: float = 80.0      # 像素/秒
-@export var texture: Texture2D
+@export var far_texture: Texture2D
+@export var near_texture: Texture2D
+@export var far_speed: float = 50.0
+@export var near_speed: float = 150.0
 
-@onready var _layer: Sprite2D = $Layer
-
-var _offset := 0.0
+var _vp: Vector2
+var _far_tiles: Array[Sprite2D] = []
+var _near_tiles: Array[Sprite2D] = []
+var _far_h := 0.0
+var _near_h := 0.0
 
 
 func _ready() -> void:
-	if texture == null:
-		var path := "res://assets/art/stars.png"
-		if ResourceLoader.exists(path):
-			texture = load(path)
-	if _layer and texture:
-		_layer.texture = texture
-		_layer.region_enabled = true
-		_layer.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		# 让贴图平铺填满整屏:region 设为视口大小,纹理 repeat 已在导入设置里开启
-		var vp := get_viewport_rect().size
-		_layer.region_rect = Rect2(0, 0, vp.x, vp.y)
-		_layer.centered = false
-		_layer.position = Vector2.ZERO
+	z_index = -10
+	_vp = get_viewport_rect().size
+	if far_texture == null and ResourceLoader.exists("res://assets/art/bg_far.png"):
+		far_texture = load("res://assets/art/bg_far.png")
+	if near_texture == null and ResourceLoader.exists("res://assets/art/bg_near.png"):
+		near_texture = load("res://assets/art/bg_near.png")
+	# 移除 .tscn 里的模板 Sprite,改由脚本生成两块
+	for child in get_children():
+		child.queue_free()
+	_far_tiles = _make_layer(far_texture, -2)
+	_near_tiles = _make_layer(near_texture, -1)
+	if far_texture:
+		_far_h = far_texture.get_height()
+	if near_texture:
+		_near_h = near_texture.get_height()
+
+
+func _make_layer(tex: Texture2D, z: int) -> Array[Sprite2D]:
+	var tiles: Array[Sprite2D] = []
+	if tex == null:
+		return tiles
+	var h := float(tex.get_height())
+	# 需要覆盖整屏 + 上方留一块备用(向下滚时从顶部补位)
+	var count := int(ceil(_vp.y / h)) + 1
+	for i in count:
+		var s := Sprite2D.new()
+		s.texture = tex
+		s.centered = false
+		s.z_index = z
+		# 从 -h 起向下铺:最上面一块在屏幕外上方,作补位用
+		s.position = Vector2(0, (i - 1) * h)
+		add_child(s)
+		tiles.append(s)
+	return tiles
 
 
 func _process(delta: float) -> void:
-	if _layer == null or texture == null:
+	_scroll(_far_tiles, _far_h, far_speed * delta)
+	_scroll(_near_tiles, _near_h, near_speed * delta)
+
+
+func _scroll(tiles: Array[Sprite2D], h: float, step: float) -> void:
+	if tiles.is_empty() or h <= 0.0:
 		return
-	_offset += scroll_speed * delta
-	var th := texture.get_height()
-	if _offset >= th:
-		_offset = fmod(_offset, th)
-	# 向下滚动:region 起点上移(纹理内容相对下移)
-	var vp := get_viewport_rect().size
-	_layer.region_rect = Rect2(0, -_offset, vp.x, vp.y)
+	for s in tiles:
+		s.position.y += step
+	# 整块移出屏幕底部 → 跳到当前最高一块的上方
+	for s in tiles:
+		if s.position.y >= _vp.y:
+			var min_y := INF
+			for other in tiles:
+				min_y = minf(min_y, other.position.y)
+			s.position.y = min_y - h

@@ -11,6 +11,7 @@ class_name BossPart
 @export var bar_size: Vector2 = Vector2(80, 12)
 @export var full_color: Color = Color(1, 0.3, 0.35)
 @export var low_color: Color = Color(1, 0.85, 0.2)
+@export var invincible: bool = false   # 无敌时打不动(核心舱用,外围炮塔全破后才解除)
 
 @onready var _sprite: Sprite2D = get_node_or_null("Sprite")
 @onready var _flash: SpriteFlash = get_node_or_null("SpriteFlash")
@@ -26,8 +27,12 @@ var _bar_fill: ColorRect
 
 func _ready() -> void:
 	current_health = max_health
+	add_to_group("enemy")
 	_build_health_bar()
 	_update_bar()
+	# 无敌部件初始隐藏血条(还打不到,不显示)
+	if invincible and _bar_root:
+		_bar_root.visible = false
 
 
 func init_part(cb: Callable) -> void:
@@ -38,8 +43,15 @@ func is_dead() -> bool:
 	return dead
 
 
-func take_damage(amount: int) -> void:
-	if dead:
+## 解除无敌(外围炮塔全破后,Boss 调用此函数让核心暴露)。
+func set_vulnerable() -> void:
+	invincible = false
+	if _bar_root:
+		_bar_root.visible = true
+
+
+func take_damage(amount: int, _hit_pos: Vector2 = Vector2.INF) -> void:
+	if dead or invincible:
 		return
 	current_health = maxi(current_health - amount, 0)
 	if _flash:
@@ -51,6 +63,7 @@ func take_damage(amount: int) -> void:
 
 func _destroyed() -> void:
 	dead = true
+	remove_from_group("enemy")
 	ExplosionManager.spawn_at(global_position)
 	SfxManager.play_explosion()
 	if _shape:
